@@ -902,33 +902,32 @@ static inline CGSize CTFramesetterSuggestFrameSizeForAttributedStringWithConstra
                     unichar newLineChar = [[truncationString string]characterAtIndex:(lastLineRange.length - 1)];
                     unichar nextLineChar = [[truncationString string]characterAtIndex:(lastLineRange.length - 2)];
                     
-                    int widthMissing = rect.size.width - (truncationLineBounds.size.width - truncationTokenBounds.size.width);
-                    int numMissing = 0;
-                    if (widthMissing > 0) {
-                        float widthOneChar = truncationTokenBounds.size.width/tokenRange.length;
-                        float floatNumMissing = widthMissing/widthOneChar;
-                        numMissing = ceil(floatNumMissing);
+                    NSUInteger lenRemainStringEnd = (NSUInteger)attributedString.length - ((NSUInteger)(lastLineRange.location + lastLineRange.length));
+                    NSInteger subLen = (NSUInteger)tokenRange.length - lenRemainStringEnd;
+                    if (subLen < 0) {
+                        subLen = 0;
                     }
                     
-                    
                     //For new line character after the last word before truncation, tokenlink range should not be substracted from the last line range length
-                    if (([[NSCharacterSet newlineCharacterSet] characterIsMember:newLineChar] || (newLineChar == ' ' && nextLineChar == '  ') || truncationLineBounds.size.width < (rect.size.width + 10)) && (lastLineRange.length > tokenRange.length) ) {
-                        tokenLinkRange = NSMakeRange((NSUInteger)(lastLineRange.location+lastLineRange.length), (NSUInteger)tokenRange.length);
+                    if (([[NSCharacterSet newlineCharacterSet] characterIsMember:newLineChar] || (newLineChar == ' ' && nextLineChar == '  ') || truncationLineBounds.size.width < (rect.size.width + 10)) || (lastLineRange.length <= tokenRange.length)) {
+                        
+                        tokenLinkRange = NSMakeRange((NSUInteger)(lastLineRange.location+lastLineRange.length), (NSUInteger)tokenRange.length - subLen);
+                        
                     } else if (lastLineRange.length > tokenRange.length) {
+                        int widthMissing = rect.size.width - (truncationLineBounds.size.width - truncationTokenBounds.size.width);
+                        int numMissing = 0;
+                        if (widthMissing > 0) {
+                            float widthOneChar = truncationTokenBounds.size.width/tokenRange.length;
+                            float floatNumMissing = widthMissing/widthOneChar;
+                            numMissing = ceil(floatNumMissing);
+                        }
+                        
                         if (numMissing < tokenRange.length){
-                            tokenLinkRange = NSMakeRange((NSUInteger)(lastLineRange.location+lastLineRange.length)-tokenRange.length+numMissing, (NSUInteger)tokenRange.length);
+                            tokenLinkRange = NSMakeRange((NSUInteger)(lastLineRange.location+lastLineRange.length)-tokenRange.length+numMissing, (NSUInteger)tokenRange.length - subLen);
                         } else {
-                            tokenLinkRange = NSMakeRange((NSUInteger)(lastLineRange.location+lastLineRange.length)-tokenRange.length, (NSUInteger)tokenRange.length);
+                            tokenLinkRange = NSMakeRange((NSUInteger)(lastLineRange.location+lastLineRange.length)-tokenRange.length, (NSUInteger)tokenRange.length - subLen);
                         }
 
-                    } else {
-                        int lenRemainStringEnd = (NSUInteger)attributedString.length - ((NSUInteger)(lastLineRange.location + lastLineRange.length));
-                        int subLen = (NSUInteger)tokenRange.length - lenRemainStringEnd;
-                        if (subLen <= 0){
-                            tokenLinkRange = NSMakeRange((NSUInteger)(lastLineRange.location+lastLineRange.length), (NSUInteger)tokenRange.length);
-                        } else {
-                            tokenLinkRange = NSMakeRange((NSUInteger)(lastLineRange.location+lastLineRange.length), (NSUInteger)tokenRange.length - subLen);
-                        }
                     }
                     
                     [self addLinkToURL:[attributedTruncationString attribute:NSLinkAttributeName atIndex:0 effectiveRange:&linkRange] withRange:tokenLinkRange];
