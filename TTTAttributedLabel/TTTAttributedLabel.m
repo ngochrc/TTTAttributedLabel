@@ -913,7 +913,7 @@ static inline CGSize CTFramesetterSuggestFrameSizeForAttributedStringWithConstra
                         
                         tokenLinkRange = NSMakeRange((NSUInteger)(lastLineRange.location+lastLineRange.length), (NSUInteger)tokenRange.length - subLen);
                         
-                    } else if (lastLineRange.length > tokenRange.length) {
+                    } else {
                         int widthMissing = rect.size.width - (truncationLineBounds.size.width - truncationTokenBounds.size.width);
                         int numMissing = 0;
                         if (widthMissing > 0) {
