@@ -750,7 +750,17 @@ static inline CGSize CTFramesetterSuggestFrameSizeForAttributedStringWithConstra
         // Check if the point is within this line vertically
         if (p.y >= yMin) {
             // Check if the point is within this line horizontally
-            if (p.x >= lineOrigin.x && p.x <= lineOrigin.x + width) {
+            //Appending truncationTokenBounds width, to accomodate truncation token width. 'width' here is calculated based on the text in the last line without considering the truncation token
+            CGContextRef c = UIGraphicsGetCurrentContext();
+            NSAttributedString *attributedTruncationString = self.attributedTruncationToken;
+            if (!attributedTruncationString) {
+                NSString *truncationTokenString = @"\u2026"; // Unicode Character 'HORIZONTAL ELLIPSIS' (U+2026)
+                attributedTruncationString = [[NSAttributedString alloc] initWithString:truncationTokenString attributes:nil];
+            }
+            CTLineRef truncationToken = CTLineCreateWithAttributedString((__bridge CFAttributedStringRef)attributedTruncationString);
+            CGRect truncationTokenBounds =  CTLineGetImageBounds(truncationToken, c);
+            
+            if (p.x >= lineOrigin.x && p.x <= lineOrigin.x + width + truncationTokenBounds.size.width) {
                 // Convert CT coordinates to line-relative coordinates
                 CGPoint relativePoint = CGPointMake(p.x - lineOrigin.x, p.y - lineOrigin.y);
                 idx = CTLineGetStringIndexForPosition(line, relativePoint);
@@ -869,7 +879,10 @@ static inline CGSize CTFramesetterSuggestFrameSizeForAttributedStringWithConstra
                 }
                 [truncationString appendAttributedString:attributedTruncationString];
                 CTLineRef truncationLine = CTLineCreateWithAttributedString((__bridge CFAttributedStringRef)truncationString);
-
+                
+                CGRect truncationLineBounds = CTLineGetImageBounds(truncationLine, c);
+                CGRect truncationTokenBounds =  CTLineGetImageBounds(truncationToken, c);
+                
                 // Truncate the line in case it is too long.
                 CTLineRef truncatedLine = CTLineCreateTruncatedLine(truncationLine, rect.size.width, truncationType, truncationToken);
                 if (!truncatedLine) {
@@ -885,7 +898,38 @@ static inline CGSize CTFramesetterSuggestFrameSizeForAttributedStringWithConstra
                 NSRange linkRange;
                 if ([attributedTruncationString attribute:NSLinkAttributeName atIndex:0 effectiveRange:&linkRange]) {
                     NSRange tokenRange = [truncationString.string rangeOfString:attributedTruncationString.string];
-                    NSRange tokenLinkRange = NSMakeRange((NSUInteger)(lastLineRange.location+lastLineRange.length)-tokenRange.length, (NSUInteger)tokenRange.length);
+                    NSRange tokenLinkRange ;
+                    unichar newLineChar = [[truncationString string]characterAtIndex:(lastLineRange.length - 1)];
+                    unichar nextLineChar = [[truncationString string]characterAtIndex:(lastLineRange.length - 2)];
+                    
+                    int widthMissing = rect.size.width - (truncationLineBounds.size.width - truncationTokenBounds.size.width);
+                    int numMissing = 0;
+                    if (widthMissing > 0) {
+                        float widthOneChar = truncationTokenBounds.size.width/tokenRange.length;
+                        float floatNumMissing = widthMissing/widthOneChar;
+                        numMissing = ceil(floatNumMissing);
+                    }
+                    
+                    
+                    //For new line character after the last word before truncation, tokenlink range should not be substracted from the last line range length
+                    if (([[NSCharacterSet newlineCharacterSet] characterIsMember:newLineChar] || (newLineChar == ' ' && nextLineChar == '  ') || truncationLineBounds.size.width < (rect.size.width + 10)) && (lastLineRange.length > tokenRange.length) ) {
+                        tokenLinkRange = NSMakeRange((NSUInteger)(lastLineRange.location+lastLineRange.length), (NSUInteger)tokenRange.length);
+                    } else if (lastLineRange.length > tokenRange.length) {
+                        if (numMissing < tokenRange.length){
+                            tokenLinkRange = NSMakeRange((NSUInteger)(lastLineRange.location+lastLineRange.length)-tokenRange.length+numMissing, (NSUInteger)tokenRange.length);
+                        } else {
+                            tokenLinkRange = NSMakeRange((NSUInteger)(lastLineRange.location+lastLineRange.length)-tokenRange.length, (NSUInteger)tokenRange.length);
+                        }
+
+                    } else {
+                        int lenRemainStringEnd = (NSUInteger)attributedString.length - ((NSUInteger)(lastLineRange.location + lastLineRange.length));
+                        int subLen = (NSUInteger)tokenRange.length - lenRemainStringEnd;
+                        if (subLen <= 0){
+                            tokenLinkRange = NSMakeRange((NSUInteger)(lastLineRange.location+lastLineRange.length), (NSUInteger)tokenRange.length);
+                        } else {
+                            tokenLinkRange = NSMakeRange((NSUInteger)(lastLineRange.location+lastLineRange.length), (NSUInteger)tokenRange.length - subLen);
+                        }
+                    }
                     
                     [self addLinkToURL:[attributedTruncationString attribute:NSLinkAttributeName atIndex:0 effectiveRange:&linkRange] withRange:tokenLinkRange];
                 }
