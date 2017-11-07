@@ -134,6 +134,8 @@ IB_DESIGNABLE
  */
 @property (nonatomic, assign) NSTextCheckingTypes enabledTextCheckingTypes;
 
+@property (nonatomic, assign) BOOL detectHTTPLinkOnly;
+
 /**
  An array of `NSTextCheckingResult` objects for links detected or manually added to the label text.
  */

@@ -343,6 +343,7 @@ static inline CGSize CTFramesetterSuggestFrameSizeForAttributedStringWithConstra
 }
 
 - (void)commonInit {
+    self.detectHTTPLinkOnly = YES;
     self.userInteractionEnabled = YES;
 #if !TARGET_OS_TV
     self.multipleTouchEnabled = NO;
@@ -1128,6 +1129,13 @@ static inline CGSize CTFramesetterSuggestFrameSizeForAttributedStringWithConstra
             if (dataDetector && [dataDetector respondsToSelector:@selector(matchesInString:options:range:)]) {
                 NSArray *results = [dataDetector matchesInString:[(NSAttributedString *)text string] options:0 range:NSMakeRange(0, [(NSAttributedString *)text length])];
                 if ([results count] > 0) {
+                    if (self.detectHTTPLinkOnly) {
+                        NSPredicate *filterHTTP = [NSPredicate predicateWithBlock:^BOOL(NSTextCheckingResult *result, NSDictionary *bindings) {
+                                                    return [result.URL.scheme caseInsensitiveCompare:@"http"] == NSOrderedSame || [result.URL.scheme caseInsensitiveCompare:@"https"] == NSOrderedSame;
+                                                }];
+                        results = [results filteredArrayUsingPredicate:filterHTTP];
+                    }
+                    
                     dispatch_async(dispatch_get_main_queue(), ^{
                         if ([[strongSelf.attributedText string] isEqualToString:[(NSAttributedString *)text string]]) {
                             [strongSelf addLinksWithTextCheckingResults:results attributes:strongSelf.linkAttributes];
